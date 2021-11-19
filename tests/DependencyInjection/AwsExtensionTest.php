@@ -124,10 +124,17 @@ class AwsExtensionTest extends TestCase
 
     /**
      * @test
+     *
+     * @dataProvider extension_should_validate_and_merge_configs_data_provider
      */
-    public function extension_should_validate_and_merge_configs()
-    {
-        putenv('AWS_MERGE_CONFIG=true');
+    public function extension_should_validate_and_merge_configs(
+        bool $mergeUsingEnvVar,
+        bool $mergeUsingConfig
+    ) {
+        if ($mergeUsingEnvVar) {
+            putenv('AWS_MERGE_CONFIG=true');
+        }
+
         $extension = new AwsExtension;
         $config = [
             'credentials' => false,
@@ -158,7 +165,6 @@ class AwsExtensionTest extends TestCase
             ],
             'profile' => 'prod',
             'region' => 'us-west-2',
-            'retries' => 5,
             'scheme' => 'http',
             'signature_version' => 'v4',
             'ua_append' => [
@@ -180,6 +186,11 @@ class AwsExtensionTest extends TestCase
             'ua_append' => 'dev',
             'validate' => true,
         ];
+
+        if ($mergeUsingConfig) {
+            $config['mergeConfiguration'] = true;
+        }
+
         $container = $this->getMockBuilder(ContainerBuilder::class)
             ->setMethods(['getDefinition', 'replaceArgument'])
             ->getMock();
@@ -191,6 +202,7 @@ class AwsExtensionTest extends TestCase
             ->method('replaceArgument')
             ->with(0, $this->callback(function ($arg) {
                 return is_array($arg)
+                    && !isset($arg['mergeConfiguration'])
                     && isset($arg['credentials'])
                     && $arg['credentials'] instanceof Reference
                     && (string) $arg['credentials'] === 'aws_sdk'
@@ -216,10 +228,28 @@ class AwsExtensionTest extends TestCase
         $extension->load([$config, $configDev], $container);
     }
 
+    public function extension_should_validate_and_merge_configs_data_provider()
+    {
+        return [
+            'the env var is enabling the configuration merging' => [
+                'mergeUsingEnvVar' => true,
+                'mergeUsingConfig' => false,
+            ],
+            'the configuration is enabling the configuration merging' => [
+                'mergeUsingEnvVar' => false,
+                'mergeUsingConfig' => true,
+            ],
+            'both the env var and configuration are enabling the configuration merging' => [
+                'mergeUsingEnvVar' => true,
+                'mergeUsingConfig' => true,
+            ],
+        ];
+    }
+
     /**
      * @test
      */
-    public function extension_should_error_merging_unknown_config_options()
+    public function extension_should_error_out_merging_unknown_config_options()
     {
         putenv('AWS_MERGE_CONFIG=true');
         $extension = new AwsExtension;

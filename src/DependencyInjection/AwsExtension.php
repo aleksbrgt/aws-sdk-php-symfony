@@ -23,13 +23,20 @@ class AwsExtension extends Extension
         );
         $loader->load('services.yml');
 
-        $configuration = new Configuration();
-        $config = $this->processConfiguration($configuration, $configs);
-        $this->inflateServicesInConfig($config);
+        $configuration = $this->processConfiguration(
+            new Configuration($this->shouldMergeConfiguration($configs)),
+            $configs
+        );
+
+        // The mergeConfiguration key is only used to pick the appropriate configuration and should not be used in
+        // the aws sdk configuration
+        unset($configuration['mergeConfiguration']);
+
+        $this->inflateServicesInConfig($configuration);
 
         $container
             ->getDefinition('aws_sdk')
-            ->replaceArgument(0, $config + ['ua_append' => [
+            ->replaceArgument(0, $configuration + ['ua_append' => [
                 'Symfony/' . Kernel::VERSION,
                 'SYMOD/' . AwsBundle::VERSION,
             ]]);
@@ -43,6 +50,24 @@ class AwsExtension extends Extension
         }
     }
 
+    private function shouldMergeConfiguration(array $configs)
+    {
+        // Old way of maintaining backwards compatibility, merge when the AWS_MERGE_CONFIG env var is set
+        if (getenv('AWS_MERGE_CONFIG') ?: false) {
+            return true;
+        }
+
+        // Merge if the mergeConfiguration key in the configuration exists and is set to true
+        foreach ($configs as $config) {
+            if (\array_key_exists('mergeConfiguration', $config)
+                && true === $config['mergeConfiguration']
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private function createServiceDefinition($name)
     {

@@ -8,33 +8,40 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
 
 class Configuration implements ConfigurationInterface
 {
+    private $shouldValidateConfiguration;
+
+    public function __construct($shouldValidateConfiguration)
+    {
+        $this->shouldValidateConfiguration = $shouldValidateConfiguration;
+    }
+
     public function getConfigTreeBuilder()
     {
-        // Maintain backwars compatibility, only merge when AWS_MERGE_CONFIG is set
-        $mergeConfig = getenv('AWS_MERGE_CONFIG') ?: false;
-        $treeType = 'variable';
-
-        if ($mergeConfig) {
-            $treeType = 'array';
+        if ($this->shouldValidateConfiguration) {
+            return $this->getTreeBuilderWithValidation();
         }
 
         // Most recent versions of TreeBuilder have a constructor
         if (\method_exists(TreeBuilder::class, '__construct')) {
-            $treeBuilder = new TreeBuilder('aws', $treeType);
+            $treeBuilder = new TreeBuilder('aws', 'variable');
         } else { // which is not the case for older versions
             $treeBuilder = new TreeBuilder;
-            $treeBuilder->root('aws', $treeType);
+            $treeBuilder->root('aws', 'variable');
         }
 
-        // If not AWS_MERGE_CONFIG, return empty, variable TreeBuilder
-        if (!$mergeConfig) {
-            return $treeBuilder;
-        }
+        return $treeBuilder;
+    }
 
-        if (method_exists($treeBuilder, 'root')) {
-            $rootNode = $treeBuilder->root('aws');
-        } else {
+    private function getTreeBuilderWithValidation()
+    {
+        // Most recent versions of TreeBuilder have a constructor
+        if (\method_exists(TreeBuilder::class, '__construct')) {
+            $treeBuilder = new TreeBuilder('aws', 'array');
             $rootNode = $treeBuilder->getRootNode();
+        } else { // which is not the case for older versions
+            $treeBuilder = new TreeBuilder;
+            $treeBuilder->root('aws', 'array');
+            $rootNode = $treeBuilder->root('aws');
         }
 
         // Define TreeBuilder to allow config validation and merging

@@ -94,6 +94,22 @@ services:
             - a-different-fake-secret
 ```
 
+#### Allow the merging of configuration
+To easily override some settings for the dev or test environments, the merging of configurations can be enabled.  
+By default, the configuration provided is not validated and cannot be merged.
+
+```yaml
+aws:
+    mergeConfiguration: true
+    ...
+```
+
+#### "Failed to generate ConfigBuilder for extension" issue
+Enabling the configuration merging as shown above fixes this issue.
+
+By default, the configuration content is not validated, and a `variable` node is used for the bundle configuration.  
+This is raising a warning starting from Symfony 5, as the t
+
 ### Usage
 
 This bundle exposes an instance of the `Aws\Sdk` object as well as instances of
